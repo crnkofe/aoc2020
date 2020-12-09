@@ -4,8 +4,16 @@ This year I'm doing [Advent of Code](https://adventofcode.com/) in Clojure. Each
 
 This requires [Leiningen](https://leiningen.org/) to run.
 
-Run exercise N with 
+Run N-th day of advent with 
 ```
 cd N
 lein run
 ```
+
+Some days have tests. Run them with
+```
+cd N
+lein test
+```
+
+Enjoy the holidays!
