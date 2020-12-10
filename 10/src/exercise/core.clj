@@ -52,7 +52,7 @@
 )
 
 (defn -main
-  "Advent of Code 2020. Exercise 10."
+  "Advent of Code 2020. Day 10."
   [& args]
   (let [sample-data (load-map "input.txt")
         reverse-data (reverse (conj (sort sample-data) 0))]
