@@ -31,7 +31,6 @@
       (if (empty? next-nodes)
         0
         (let []
-          ; (println (drop-until-match (rest numbers) (first next-nodes)))
           (reduce + (map #(count-variations (drop-until-match (rest numbers) %)) next-nodes))
          )
       )
