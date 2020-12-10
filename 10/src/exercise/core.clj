@@ -7,7 +7,9 @@
     )
  )
 
-(defn sum-difference [numbers]
+(defn sum-difference 
+  "Part 1: Calculate consecutive list differences. Count amount of 1 and 3 differences then multiply counts together"
+  [numbers]
   (let [sorted-numbers (sort numbers)
         offset-numbers (next sorted-numbers)
 		differences (map #(- (nth offset-numbers %) (nth sorted-numbers %)) (range (count offset-numbers)))
@@ -16,29 +18,23 @@
   )
 )
 
-(defn drop-until-match [numbers match]
+(defn drop-until-match 
+  "Shorthand for a list [1 2 3] drop all elements until a match is found"
+  [numbers match]
   (if (= (first numbers) match)
     numbers
     (drop-until-match (rest numbers) match)
   )
 )
 
-(defn count-variations [numbers]
-  (if (<= (count numbers) 1)
-    1
-    (let [n1 (first numbers)
-          next-nodes (filter #(and (> % n1) (<= % (+ n1 3))) numbers)]
-      (if (empty? next-nodes)
-        0
-        (let []
-          (reduce + (map #(count-variations (drop-until-match (rest numbers) %)) next-nodes))
-         )
-      )
-    )
-  )
-)
+(defn count-variations-reverse 
+  "Part 2: Find variations of numbers with an additional constraint that two consecutive numbers must be at most 3 apart
+   Solution is partially inspired by dynamic programming. Reverse the list, then build result bottom up.
 
-(defn count-variations-reverse [numbers partial-results idx]
+   For each number check all reachable consecutive numbers and store result in hashmap. Instead of recomputing
+   results use computed solutions when moving towards first number.
+  "
+  [numbers partial-results idx]
   (if (>= idx (count numbers))
     (let []
       (get partial-results (nth numbers (- idx 1)))
