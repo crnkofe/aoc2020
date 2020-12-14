@@ -108,7 +108,6 @@
            processed-lines []
            current-mask nil
            memory {}]
-        ; (println (first unprocessed-lines))
         (if (empty? unprocessed-lines)
           memory
           (let [line (first unprocessed-lines)
@@ -122,7 +121,6 @@
               (if (nil? (nth parsed-mask 1)) current-mask (nth parsed-mask 1))
               (if (not (nil? location))
                 (let [addresses (flatten (generate-addresses (reverse current-mask) 0 (Integer/parseInt location) 1))]
-                  ; (println "a" location value current-mask addresses)
                   (reduce (partial reduce-map-address (Integer/parseInt value)) memory addresses)
                 )
                 memory
@@ -137,8 +135,6 @@
 (defn -main
   "Advent of Code. Day 14"
   [& args]
-  ; (println "Result of part 1" (reduce + (vals (load-commands "sample.txt"))))
-  ; (println (flatten (generate-addresses (reverse "000000000000000000000000000000X1001X") 0 42 1)))
-  ; (println (flatten (generate-addresses (reverse "00000000000000000000000000000000X0XX") 0 26 1)))
-  (println "REsult of part 2" (reduce + (vals (exec-commands-part2 "input.txt"))))
+  (println "Result of part 1" (reduce + (vals (load-commands "sample.txt"))))
+  (println "Result of part 2" (reduce + (vals (exec-commands-part2 "input.txt"))))
 )
