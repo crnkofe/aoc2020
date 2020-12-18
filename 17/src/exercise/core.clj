@@ -173,7 +173,6 @@
   (let []
     (loop [turn 1
            dimension-map initial-dimension-map]
-      (println "turn" turn)
       (if (> turn max-turns)
         dimension-map
         (recur (inc turn) (play-round-4 dimension-map))
