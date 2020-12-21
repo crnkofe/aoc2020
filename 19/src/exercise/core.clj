@@ -45,33 +45,24 @@
 (defn check-rule [s offset rule rules limit]
   (if (<= limit 0)
     (let [] 
-      (println "limit reached")
-    [false offset]
+       (println "limit reached")
+    [[false offset]]
     )
 	(if (contains? rule :rule)
 	  (let [[valid next-idx] (validate-char s rule offset)]
+        (println "check-rule-valid" valid rule offset (count s))
 		(if (not valid)
-		  [false next-idx]
-		  [true next-idx]
+		  [[false next-idx]]
+		  [[true next-idx]]
 		)
 	  )
 	  (let [] 
-	  (println "check-rule" (get rule :id))
-	  (let [[valid-left left-idx] (validate-indices s (first (get rule :or)) rules offset (dec limit))]
-		; (println "valid-left" valid-left (count (get rule :or)))
-		(if valid-left
-		  [true left-idx]
-		  (if (> (count (get rule :or)) 1)
-			(let [[valid-right right-idx] (validate-indices s (nth (get rule :or) 1) rules offset (dec limit))]
-			  ; (println "valid-right" valid-right)
-			  (if valid-right
-				[true right-idx]
-				[false offset]
-			  )
-			)
-			[false offset]
-		  )
-		)
+	  ; (println "check-rule" (get rule :id))
+	  (let [[valid-left left-idx] (validate-indices s (first (get rule :or)) rules offset (dec limit) [])
+            right-result (if (> (count (get rule :or)) 1) (validate-indices s (nth (get rule :or) 1) rules offset (dec limit) []) []) 
+            result (into [] (concat [ [valid-left left-idx] ] [right-result]))]
+		(println "result" result)
+		result
 	  )
 	  )
 	)
@@ -81,37 +72,51 @@
 (defn validate-indices
   "Validates rules of form [n1 n2 n3]}
    Rules must be validated in order so when first is validated go to nth char index and continue"
-  [s starting-indices rules char-idx limit]
+  [s indices rules offset limit path]
   (if (<= limit 0)
     (let [] 
       (println "limit reached" limit)
-      [false char-idx]
+      [false offset]
     )
-	(loop [indices starting-indices
-		   offset char-idx]
-		; (println indices (empty? indices))
-		(if (empty? indices)
-		  [true offset] ;; rules must match entire string
-		  (let [] 
-			; (println "check" (first indices))
-		  (let [next-rule (first (filter #(= (first indices) (get % :id)) rules)) 
-				[validated next-offset] (check-rule s offset next-rule rules (dec limit))]
-			; (println "enforce rule" next-rule " on " s "at" offset validated )
-			(if (not validated)
-			  [false char-idx]
-			  (recur (rest indices) next-offset)
-			)
-		  )
-		  )
-		)
-	  )
-	)
+    ; (println indices (empty? indices))
+    (if (empty? indices)
+      (let []
+        (println "end-of-the-line-0" indices offset path)
+        [true offset path] ;; rules must match entire string
+      )
+    ; (println "check" (first indices))
+      (let [next-rule (first (filter #(= (first indices) (get % :id)) rules)) 
+            results (filter #(= true (first %)) (check-rule s offset next-rule rules (dec limit)))]
+          ;; TODO: make this work at each offset
+          (if (empty? results)
+            (let []
+              (println "end-of-the-line-1" indices offset path)
+              [false offset path]
+            )
+            (let [validated-results (map #(validate-indices s (rest indices) rules (nth % 1) (dec limit) (conj path (nth % 1))) results)
+                  filtered-results (filter #(= true (first %)) validated-results)]
+              (if (empty? filtered-results)
+                (let []
+                  (println "results" validated-results)
+                  (println "hakuna" indices offset)
+                  [false offset path]
+                )
+                (let []
+                  (println "filtered-results" indices filtered-results)
+                  (first filtered-results)
+                )
+              )
+            )
+          )
+      )
+    )
+    )
   )
 
 (defn validate-string [s all-rules]
   (let [rule-0 (first (filter #(= 0 (get % :id)) all-rules))
-        [result final-offset] (validate-indices s (first (get rule-0 :or)) all-rules 0 1000)]
-    (println result final-offset)
+        [result final-offset path] (validate-indices s (first (get rule-0 :or)) all-rules 0 1000 [])]
+    (println "AJAJA" result final-offset path)
     (and result (>= final-offset (count s)))
   )
 )
@@ -119,11 +124,11 @@
 (defn -main
   "Advent of Code. Day 19"
   [& args]
-  (let [filename "input.txt"
+  (let [filename "sample3.txt"
         rules (load-rules filename)
         strs (load-strings filename)
         ]
     ; (println "Solution of part 1:" (count (filter #(validate-string % rules) strs)))
-    (println "Solution of part 2:" (count (filter #(validate-string % rules) strs)))
+    (println "Solution of part 2:" (filter #(validate-string % rules) strs))
   )
 )
