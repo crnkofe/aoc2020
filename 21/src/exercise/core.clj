@@ -4,13 +4,6 @@
 (require '[clojure.string :as str])
 (require '[clojure.set :as sets])
 
-;; idea 1:
-;; - start by parsing input, for each token get all possible alergens (store all alergens as set) it can contain (contains only one)
-;; - idea start parsing with the shortest list (least ideas to try early one)
-;; - do the following recursively - assign allergen to one token
-;; - try removing it and the allergenm from every list - if in any list only 1 token remains it gets automatically assigned
-;; - if the ingredient is the only one in list check if the list
-
 (defn parse-line [line]
   (let [[ingredients-raw allergens-raw] (str/split (apply str (drop-last line)) #" \(contains ")]
       {:ingredients (into #{} (str/split ingredients-raw #" "))
@@ -24,40 +17,55 @@
     )
   )
 
-(defn coalesce
-  "Returns first non-nil argument."
-  [& args]
-  (first (keep identity args)))
+(defn find-non-alergens
+  "The idea is that simply organize most frequent to least frequent allergen
+  take all assignments with that allergen - do set intersections between them - what remains must be an alergen
+  remove the alergen and ingredient and repeat
+  "
+  [assignments]
 
-(defn assign-single-allergen [assignments allergen ingredient]
-  (map #(hash-map :ingredients (get % :ingredients) :allergens (disj (get % :allergens) allergen)) assignments)
+  (let [freqs (into [] (reverse (sort-by #(nth % 1) (frequencies (reduce concat [] (map #(get % :allergens) assignments))))))]
+    (loop [remaining-freqs freqs
+           assign assignments]
+        (if (empty? remaining-freqs)
+          assign
+          (let [[allergen _] (first remaining-freqs)
+                result-ingredient (first (reduce sets/intersection (map #(get % :ingredients) (filter #(contains? (get % :allergens) allergen) assign))))
+                new-assign (map #(hash-map :ingredients (disj (get % :ingredients) result-ingredient) :allergens (disj (get % :allergens) allergen)) assign)]
+            (recur (rest remaining-freqs) new-assign)
+          )
+        )
+      )
+    )
   )
 
-(defn assign-allergens
-  "assigns alergens depth first - removes ingredient and alergen from all assignments - then checks validity
-   assignments is 
-   all-ingredients is a set of all ingredients"
-  [assignments all-allergens assigned]
-  ; (println "ass" assignments all-allergens assigned)
-  (if (empty? all-allergens)
-    [assignments assigned]
-    (loop [allergen-id 0]
-      ; (println "allergen-id" allergen-id (map #(get %  :ingredients) assignments))
-      (if (>= allergen-id (count all-allergens))
-        [nil nil]
-        (let [allergen-lst (into [] all-allergens)
-              allergen (nth allergen-lst allergen-id)
-              remaining-ingredients (reduce sets/union #{} (map #(get % :ingredients) assignments))
-              result (first (filter #(not= [nil nil] 
-                                   (assign-allergens 
-                                     (assign-single-allergen assignments allergen %)
-                                     (disj all-allergens allergen)
-                                     (merge assigned {allergen %})
-                                   )) remaining-ingredients ))]
-            (if (not= [nil nil] result)
-              result
-              (recur (inc allergen-id))
-              )
+(defn count-appearances [parsed-input]
+  (loop [filter-ingredients (reduce sets/union (map #(get % :ingredients) (find-non-alergens parsed-input)))
+         count-appearances 0]
+      (if (empty? filter-ingredients)
+        count-appearances
+        (recur (rest filter-ingredients) (+ count-appearances (count (filter #(contains? (get % :ingredients) (first filter-ingredients)) parsed-input))))
+        )
+    )
+  )
+
+(defn find-alergens
+  "The idea is that simply organize most frequent to least frequent allergen
+  take all assignments with that allergen - do set intersections between them - what remains must be an alergen
+  remove the alergen and ingredient and repeat
+  "
+  [assignments]
+
+  (let [freqs (into [] (reverse (sort-by #(nth % 1) (frequencies (reduce concat [] (map #(get % :allergens) assignments))))))]
+    (loop [remaining-freqs freqs
+           assign assignments
+           allergen-map {}]
+        (if (empty? remaining-freqs)
+          allergen-map
+          (let [[allergen _] (first remaining-freqs)
+                result-ingredient (first (reduce sets/intersection (map #(get % :ingredients) (filter #(contains? (get % :allergens) allergen) assign))))
+                new-assign (map #(hash-map :ingredients (disj (get % :ingredients) result-ingredient) :allergens (disj (get % :allergens) allergen)) assign)]
+            (recur (rest remaining-freqs) new-assign (assoc allergen-map allergen result-ingredient))
           )
         )
       )
@@ -67,11 +75,13 @@
 (defn -main
   "Advent of Code. Day 21"
   [& args]
-  (let [filename "sample.txt"
+  (let [filename "input.txt"
         parsed-input (parse-input filename)
         all-alergens (reduce sets/union #{} (map #(get % :allergens) parsed-input))
-        all-ingredients (reduce sets/union #{} (map #(get % :ingredients) parsed-input))]
-    (println parsed-input)
-    (println (assign-allergens parsed-input all-alergens {}))
+        all-ingredients (reduce sets/union #{} (map #(get % :ingredients) parsed-input))
+        ]
+    (println "Solution of part 1:" (count-appearances parsed-input))
+    (println "Solution of part 2:" (str/join "," (map #(nth % 1) (sort-by #(nth % 0) (find-alergens parsed-input)))))
+
   )
 )
