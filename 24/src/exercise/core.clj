@@ -55,7 +55,6 @@
   (let [color (get hex-grid point :white)
         neighbours (filter #(not= nil %) (map #(get hex-grid (sum-point point %) :nil) [[1 0] [-1 1] [1 -1] [-1 0] [0 1] [0 -1]]))
         count-black (count (filter #(= :black %) neighbours))]
-        ; count-white (count (filter #(= :white %) neighbours))]
       (if (and (= color :white) (= count-black 2))
         [point :black]
         (if (and (= color :black) (or (= 0 count-black) (> count-black 2)))
@@ -67,20 +66,22 @@
     )
 
 (defn play-round [hex-grid]
-  ;; TODO: figure out how to fight stack overflow
-  (let [extended-grid-keys (map #(apply sum-point %) (into #{} (combo/cartesian-product (keys hex-grid) [[1 0] [-1 1] [1 -1] [-1 0] [0 1] [0 -1]])))
-        flipped-map (map #(flip-on-rules [(first %) (second %)] hex-grid) extended-grid-keys)]
-    ;(println extended-grid-keys)
-    (apply hash-map (reduce concat [] flipped-map))
+  (let [extended-grid-keys (map #(apply sum-point %) (reduce conj #{} (combo/cartesian-product (keys hex-grid) [[1 0] [-1 1] [1 -1] [-1 0] [0 1] [0 -1]])))
+        flipped-map (->> (map #(flip-on-rules [(first %) (second %)] hex-grid) extended-grid-keys)
+                         (filter #(not= (second %) :white)))
+        ]
+    (reduce (fn [grid [key value]] (assoc grid key value)) {} flipped-map)
   )
 )
 
 (defn play-rounds [in-hex-grid rounds]
   (loop [hex-grid in-hex-grid
          round 0]
-    (if (> round rounds)
+    (if (>= round rounds)
       hex-grid
-      (recur (play-round hex-grid) (inc round))
+      (let [rnd (play-round hex-grid)]
+        (recur rnd (inc round))
+      )
     )
   )
 )
@@ -88,11 +89,10 @@
 (defn -main
   "Advent of Code. Day 24."
   [& args]
-  (let [filename "sample.txt"
+  (let [filename "input.txt"
         loaded-map (load-map filename)
-        interactive-map (play-rounds loaded-map 5)]
-    (print "Solution of part 1:" (count (filter #(= :black %) (vals loaded-map))))
-    (println interactive-map)
-    (print "Solution of part 2:" (count (filter #(= :black %) (vals interactive-map))))
+        interactive-map (play-rounds loaded-map 100)]
+    (println "Solution of part 1:" (count (filter #(= :black %) (vals loaded-map))))
+    (println "Solution of part 2:" (count (filter #(= :black %) (vals interactive-map))))
   )
 )
