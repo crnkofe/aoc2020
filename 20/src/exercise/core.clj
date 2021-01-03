@@ -82,7 +82,10 @@
 )
 
 (defn reflect-list [lst]
-  (list (nth lst 2) (apply str (reverse (nth lst 1))) (nth lst 0) (apply str (reverse (nth lst 3))))
+  (list (nth lst 2) 
+        (apply str (reverse (nth lst 1))) 
+        (nth lst 0) 
+        (apply str (reverse (nth lst 3))))
   )
 
 (defn generate-frame-rotations [frame]
@@ -99,6 +102,38 @@
     )
   )
 )
+
+(defn rotate-frame [lst]
+  (let [row-count (count lst)]
+    (loop [rotated-frame []
+           col 0]
+      (if (>= col row-count)
+        rotated-frame
+        (recur (conj rotated-frame (apply str (reverse (map #(nth % col) lst)))) (inc col))
+        )
+      )
+    )
+  )
+
+(defn reflect-frame [lst]
+  (reverse lst)
+  )
+
+(defn generate-full-frame-rotation [frame rot reflect]
+  (let [id (get frame :id)
+        d (get frame :data)]
+    (case [rot reflect]
+      [0 0] {:id id :data d :rot 0 :reflect 0}
+      [0 1] {:id id :data (reflect-frame d) :rot rot :reflect reflect}
+      [1 0] {:id id :data (rotate-frame d) :rot rot :reflect reflect}
+      [1 1] {:id id :data (reflect-frame (rotate-frame d)) :rot rot :reflect reflect}
+      [2 0] {:id id :data (rotate-frame (rotate-frame d)) :rot rot :reflect reflect}
+      [2 1] {:id id :data (reflect-frame (rotate-frame (rotate-frame d))) :rot rot :reflect reflect}
+      [3 0] {:id id :data (rotate-frame (rotate-frame (rotate-frame d))) :rot rot :reflect reflect}
+      [3 1] {:id id :data (reflect-frame (rotate-frame (rotate-frame (rotate-frame d)))) :rot rot :reflect reflect}
+      )
+    )
+  )
 
 ;; reverting to graph search 
 ;; trying to do a clean depth-first search here - first I'll just generate all options then from there
@@ -177,6 +212,88 @@
   )
 )
 
+(defn cut-edges [piece]
+  (into [] (drop 1 (drop-last 1 (map #(apply str (drop 1 (drop-last 1 %))) (into [] piece)))))
+  )
+
+(defn reduce-row-piece [piece-data new-piece-data]
+  (map #(apply str (nth piece-data %) (nth new-piece-data %)) (range (count piece-data)))
+  )
+
+(defn prepare-full-image 
+  "Assembly is a list of puzzle blocks (data is unoriented)
+
+  First rows need to be properly rotated and reflected, 
+  then each puzzle block needs to be inserted into full image
+  "
+  [assembly]
+  (let [row-width (Math/sqrt (count assembly))
+        row-size (count (get (nth assembly 0) :data))]
+    (loop [full-image []
+            row 0]
+        (if (>= row row-width)
+          full-image
+          (let [pieces (map #(cut-edges 
+                               (get (nth assembly %) :data)) 
+                            (range (* row row-width) (* (inc row) row-width)))
+                merged-pieces (reduce reduce-row-piece (first pieces) (rest pieces))
+                ]
+            (recur (concat full-image merged-pieces) (inc row))
+            )
+          )
+        )
+      )
+  )
+
+(defn is-monster-part [candidate-row nessie-row]
+  (if (= (count candidate-row) (count nessie-row))
+    (let [nessie-idx-hash (map first (filter #(not= (second %) \ ) (map-indexed vector nessie-row)))
+          hashes (count (filter #(= \# (nth candidate-row % nil)) nessie-idx-hash))
+          non-hashes (count (filter #(not= \# (nth candidate-row % nil)) nessie-idx-hash))
+          nessie-idx-empty (map first (filter #(= (second %) \ ) (map-indexed vector nessie-row)))
+          empty-hashes (count (filter #(= \# (nth candidate-row % nil)) nessie-idx-empty)) ]
+      [(and (> hashes 0) (= non-hashes 0)) empty-hashes]
+    )
+    [false 0]
+  )
+)
+
+(defn is-monster [candidate nessie]
+  (if (= (count candidate) (count nessie))
+    (let [row-results (map #(is-monster-part (nth candidate % "") (nth nessie % "")) (range (count nessie)))
+          is-match (if (> (count row-results) 0) (= 0 (count (filter #(= false (first %)) row-results))) false)
+          count-common (if (> (count row-results) 0) (reduce + (map second row-results)) 0)]
+      [is-match count-common]
+    )
+    [false 0]
+  )
+)
+
+(defn find-monsters [full-image]
+  (let [nessie ["                  # " 
+                "#    ##    ##    ###" 
+                " #  #  #  #  #  #   "]
+        nessie-hash-power (count (filter #(= \# %) (flatten (map #(into [] %) nessie))))
+        ness-size (count (first nessie))
+        row-len (count (first full-image))
+        row-count (count full-image)]
+   (loop [row 0
+          col 0
+          total-count 0]
+     (if (> row row-count)
+       total-count
+       (let [next-row (if (= 0 (mod (inc col) row-len)) (inc row) row)
+             candidate-monster (map #(apply str %) [(take ness-size (drop col (nth full-image row "")))
+                                (take ness-size (drop col (nth full-image (+ 1 row) "")))
+                                (take ness-size (drop col (nth full-image (+ 2 row) "")))])
+             [is-match count-matching] (is-monster candidate-monster nessie)]
+           (recur next-row (mod (inc col) row-len) (if is-match (+ nessie-hash-power total-count) total-count))
+         )
+       )
+     )
+   )
+ )
+
 (defn -main
   "Advent of Code 2020. Day 20"
   [& args]
@@ -190,5 +307,24 @@
                         (peek assembly))]
       (println "Result of part 1:" (reduce * (map #(get % :id) corners)))
       )
+
+    (let [tile-map (reduce (fn [tile-map tile] (assoc tile-map (get tile :id) tile)) {} loaded-tiles)
+          full-assembly (map #(generate-full-frame-rotation (get tile-map (get % :id)) (get % :rot) (get % :reflect)) assembly)
+          full-image (prepare-full-image full-assembly) ]
+      (loop [combos [[0 0] [0 1] [1 0] [1 1] [2 0] [2 1] [3 0] [3 1]]]
+        (if (empty? combos)
+          nil
+          (let [frame-variant (generate-full-frame-rotation {:id 1 :data full-image} (first (first combos)) (second (first combos)))
+                monster-count (find-monsters (get frame-variant :data))
+                total-hash-count (count (filter #(= \# %) (apply concat (flatten (into [] (get frame-variant :data))))))]
+            (when (> monster-count 0)
+              ;; it turns out only one habitat contains monsters
+              (println "Result of part 2:" (- total-hash-count monster-count))
+              )
+            (recur (rest combos))
+           )
+          )
+        )
+      )
+    )
   )
-)
