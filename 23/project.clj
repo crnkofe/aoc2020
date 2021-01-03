@@ -6,5 +6,6 @@
   :dependencies [[org.clojure/clojure "1.10.1"]]
   :main ^:skip-aot exercise.core
   :target-path "target/%s"
+  :jvm-opts ["-Xmx8g"]
   :profiles {:uberjar {:aot :all
                        :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}})
